@@ -1,0 +1,186 @@
+INSERT INTO Query1(
+       SELECT count(*) AS num
+       FROM countries C, winemakers WM, wine W
+       WHERE C.cname='Spain'
+             AND C.cid = WM.cid
+	     AND WM.wmid = W.wmid
+	     AND W.wyear > 2000
+	     AND W.msrp < 20
+	ORDER BY num ASC
+);
+
+INSERT INTO Query2(
+	SELECT winemakers.wmname 
+	FROM (SELECT wmid, COUNT(wid) AS rosecount
+		FROM wine, winecolours
+		WHERE wine.wcid = winecolours.wcid
+			AND winecolours.wcname = 'Rose'
+		GROUP BY wine.wmid) AS Temp1
+		JOIN winemakers ON Temp1.wmid = winemakers.wmid
+	WHERE Temp1.rosecount = (SELECT MAX(Temp2.rosecount)
+				FROM (SELECT wmid, COUNT(wid) AS rosecount
+					FROM wine, winecolours
+					WHERE wine.wcid = winecolours.wcid
+						AND winecolours.wcname = 'Rose'
+					GROUP BY wine.wmid) AS Temp2 )
+	ORDER BY winemakers.wmname ASC
+
+);
+
+INSERT INTO Query3(
+       SELECT C.cname AS cname, WM.wmname AS wmname, AVG(R.rating) AS rating
+       FROM countries C, winemakers WM, ratings R, wine W
+       WHERE C.cid = WM.cid
+       	     AND WM.wmid = W.wmid
+	     AND W.rid = R.rid
+       GROUP BY C.cid, C.cname, WM.wmid, WM.wmname
+       HAVING AVG(R.rating) >= ALL(SELECT AVG(R2.rating)
+       	      		           FROM winemakers WM2, ratings R2, wine W2
+       				   WHERE WM2.wmid = W2.wmid
+	     			   	 AND W2.rid = R2.rid
+				      	 AND WM2.cid = WM.cid
+       				   GROUP BY WM2.cid, WM2.wmid)
+	ORDER BY C.cname ASC, rating DESC		       	
+);
+
+INSERT INTO Query4(
+	SELECT wyear, AVG(rating) AS avgRating
+	FROM wine, ratings, winemakers, countries
+	WHERE wine.rid = ratings.rid
+		AND wine.wmid = winemakers.wmid
+		AND winemakers.cid = countries.cid
+		AND wyear >= 2001
+		AND wyear <= 2010
+		AND countries.cname = 'Spain'
+	GROUP BY wyear
+	HAVING AVG(rating) = (SELECT MAX(Temp1.avgRating)
+			    FROM (  SELECT wyear, AVG(rating) AS avgRating
+				    FROM wine, ratings, winemakers, countries
+				    WHERE wine.rid = ratings.rid
+					    AND wine.wmid = winemakers.wmid
+					    AND winemakers.cid = countries.cid
+					    AND wyear >= 2001
+					    AND wyear <= 2010
+					    AND countries.cname = 'Spain'
+				    GROUP BY wyear ) AS Temp1
+				    WHERE Temp1.avgRating <> (SELECT MAX(Temp2.avgRating)
+							      FROM (  SELECT wyear, AVG(rating) AS avgRating
+								      FROM wine, ratings, winemakers, countries
+								      WHERE wine.rid = ratings.rid
+									      AND wine.wmid = winemakers.wmid
+									      AND winemakers.cid = countries.cid
+									      AND wyear >= 2001
+									      AND wyear <= 2010
+									      AND countries.cname = 'Spain'
+								      GROUP BY wyear ) AS Temp2
+								)
+			     )
+	ORDER BY wyear ASC
+);
+
+
+INSERT INTO Query5(
+       SELECT DISTINCT(WM.wmname)
+       FROM countries C, winemakers WM
+       WHERE C.cname = 'Spain'
+       	     AND C.cid = WM.cid
+       	     AND NOT EXISTS(SELECT W.wid
+	     	            FROM wine W
+			    WHERE W.wmid = WM.wmid
+			    	  AND EXISTS(SELECT WC.wcid
+	     	             		     	FROM winecolours WC
+			     		     	WHERE WC.wcname <> 'Rose'
+						      AND WC.wcid = W.wcid))
+       ORDER BY WM.wmname ASC
+);
+
+INSERT INTO Query6(
+	SELECT disc.wname, winemakers.wmname, merchants.mname
+	FROM (SELECT wine.wid, wine.wname, wine.wmid, pricelist.mid
+		FROM pricelist, wine
+		WHERE pricelist.wid = wine.wid
+			AND pricelist.price < wine.msrp  -- Discounts
+			AND (wine.wyear + wine.bestbeforeny) < pricelist.startyear -- After expiry date
+		) AS disc
+		JOIN winemakers ON disc.wmid = winemakers.wmid
+		JOIN merchants ON disc.mid = merchants.mid
+	WHERE disc.wid NOT IN (
+		SELECT DISTINCT wine.wid 
+		FROM pricelist, wine
+		WHERE pricelist.wid = wine.wid
+			AND pricelist.price < wine.msrp  -- Discounts
+			AND (wine.wyear + wine.bestbeforeny) >= pricelist.startyear -- Before expiry date
+		) 
+	ORDER BY wname ASC, wmname ASC, mname ASC
+);
+
+CREATE VIEW redCandidates(wmid, wmname, wid) AS
+SELECT WM.wmid, WM.wmname, W.wid
+FROM countries C, winemakers WM, wine W
+WHERE C.cname = 'Spain'
+      AND C.cid = WM.cid
+      AND WM.wmid = W.wmid
+      AND W.wcid IN (SELECT WC.wcid
+      	             FROM winecolours WC
+		     WHERE WC.wcname = 'Red')
+      AND W.msrp > ANY (SELECT P.price
+      			 FROM pricelist P
+			 WHERE W.wid = P.wid  -- Check price is in October 2013
+			 	AND (P.startyear < 2013 OR (P.startyear = 2013 AND P.startmonth <= 10)) -- Start price is before 2013 or 
+				AND (P.endyear > 2013 OR (P.endyear = 2013 AND P.endmonth >= 10)) -- End price is after 2013
+			)
+GROUP BY WM.wmid, WM.wmname, W.wid;
+
+CREATE VIEW roseCandidates(wmid, wmname, wid) AS
+SELECT WM.wmid, WM.wmname, W.wid
+FROM countries C, winemakers WM, wine W
+WHERE C.cname = 'Spain'
+      AND C.cid = WM.cid
+      AND WM.wmid = W.wmid
+      AND W.wcid IN (SELECT WC.wcid
+      	             FROM winecolours WC
+		     WHERE WC.wcname = 'Rose')
+      AND W.msrp > ANY (SELECT P.price
+      			 FROM pricelist P
+			 WHERE W.wid = P.wid -- Check price is in October 2013
+			 	AND (P.startyear < 2013 OR (P.startyear = 2013 AND P.startmonth <= 10)) -- Start price is before 2013 or i
+				AND (P.endyear > 2013 OR (P.endyear = 2013 AND P.endmonth >= 10)) -- End price is after 2013	
+			)	
+GROUP BY WM.wmid, WM.wmname, W.wid;
+
+CREATE VIEW redRoseCandidates(wmid) AS
+SELECT wmid
+FROM redCandidates
+INTERSECT
+SELECT wmid
+FROM roseCandidates;
+
+CREATE VIEW candidatesRating(wmid,wmname,wid) AS
+SELECT *
+FROM redCandidates
+UNION ALL
+SELECT *
+FROM roseCandidates;
+
+CREATE VIEW redRoseCandidatesAvg(wmid, wmname, avgRating) AS
+SELECT cR.wmid, cR.wmname, AVG(R.rating) AS avgRating
+FROM candidatesRating cR, wine W, ratings R
+WHERE cR.wmid IN (SELECT *
+      		    FROM redRoseCandidates)
+	AND cR.wid = W.wid
+	AND W.rid = R.rid
+GROUP BY cR.wmid, cR.wmname;	
+
+INSERT INTO Query7(
+       SELECT avgs.wmname, avgs.avgRating
+       FROM (SELECT * 
+	     FROM redRoseCandidatesAvg AS temp1
+	     WHERE temp1.avgRating = (SELECT MAX(findMax.avgRating)
+				      FROM redRoseCandidatesAvg findMax)
+	     UNION ALL
+	     SELECT *
+	     FROM redRoseCandidatesAvg AS temp2
+	     WHERE temp2.avgRating = (SELECT MIN(findMin.avgRating)
+				      FROM redRoseCandidatesAvg findMin)) AS avgs												  
+       ORDER BY avgs.avgRating DESC, avgs.wmname ASC  
+);

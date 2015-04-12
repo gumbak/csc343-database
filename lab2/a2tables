@@ -1,0 +1,42 @@
+-- Part 1
+
+-- Question 1 
+CREATE TABLE Query1 (
+       num INTEGER 
+);
+
+CREATE TABLE Query2 (
+	wmname VARCHAR(20) 
+);
+
+-- Question 3
+CREATE TABLE Query3 (
+       cname VARCHAR(20),
+       wmname VARCHAR(20),
+       rating DOUBLE PRECISION
+);
+
+
+CREATE TABLE Query4 (
+	year INTEGER, 
+	avgRating DOUBLE PRECISION
+);
+
+
+-- Question 5
+CREATE TABLE  Query5 (
+       wmname VARCHAR(20) 
+);
+
+
+CREATE TABLE Query6 (
+	wname VARCHAR(20), 
+	wmname VARCHAR(20),
+	mname VARCHAR(20)
+);
+
+-- Question 7
+CREATE TABLE Query7 (
+       wmname VARCHAR(20),
+       avgRating DOUBLE PRECISION
+);

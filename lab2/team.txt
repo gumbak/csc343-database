@@ -1,0 +1,12 @@
+Couse: CSC343 Fall 2013 Section 1
+
+Team of 2
+Team member 1: Fiona Faang-Yu Tran
+Cdflogin: c3tranfi
+Student number: 997592751
+Grace days used: 0/3
+
+Team member 2: Kevin Gumba
+Cdflogin: c3gumbak
+Student number: 997585117
+Grace days used: 0/3
